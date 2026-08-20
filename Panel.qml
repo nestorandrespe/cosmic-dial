@@ -47,9 +47,27 @@ Panel {
   readonly property real simEarthRotation: ((simulatedDate.getUTCHours() * 60 + simulatedDate.getUTCMinutes() + simulatedDate.getUTCSeconds() / 60) / 1440.0) * 360
   readonly property real simDaysToFull: (0.5 - simPhaseFraction + 1) % 1 * simSynodic
   readonly property real simDaysToNew: (1.0 - simPhaseFraction) % 1 * simSynodic
-  readonly property int simLunation: Math.floor(simDaysSince / simSynodic)
-  readonly property string simPhaseEmoji: root.getPhaseEmoji(simPhaseFraction)
-  readonly property string simPhaseName: root.getPhaseName(simPhaseFraction)
+  readonly property real simDayOfYear: {
+    var now = root.simulatedDate;
+    var start = new Date(now.getFullYear(), 0, 0);
+    var diff = now - start;
+    return Math.floor(diff / 86400000);
+  }
+  readonly property real simSolarDeclination: -23.44 * Math.cos((simDayOfYear + 10) * 2 * Math.PI / 365)
+  readonly property string simNorthSeason: {
+    var d = root.simDayOfYear;
+    if (d >= 79 && d < 172) return "Spring 🌱";
+    if (d >= 172 && d < 265) return "Summer ☀️";
+    if (d >= 265 && d < 355) return "Autumn 🍂";
+    return "Winter ❄️";
+  }
+  readonly property string simSouthSeason: {
+    var d = root.simDayOfYear;
+    if (d >= 79 && d < 172) return "Autumn 🍂";
+    if (d >= 172 && d < 265) return "Winter ❄️";
+    if (d >= 265 && d < 355) return "Spring 🌱";
+    return "Summer ☀️";
+  }
 
   function getPhaseEmoji(f) {
     if (f < 0.0312 || f >= 0.9688) return "🌑";
@@ -1576,6 +1594,199 @@ Panel {
               hoverEnabled: true
               cursorShape: Qt.PointingHandCursor
             }
+          }
+        }
+
+        // Vertical separator line 2
+        Rectangle {
+          Layout.preferredWidth: 1
+          Layout.fillHeight: true
+          color: Qt.rgba(root.fb.r, root.fb.g, root.fb.b, 0.12)
+        }
+
+        // Section 3: Earth Axial Tilt & Seasons
+        Rectangle {
+          Layout.preferredWidth: 260
+          Layout.fillHeight: true
+          radius: 6
+          color: tiltMa.containsMouse ? Qt.rgba(root.fb.r, root.fb.g, root.fb.b, 0.08) : Qt.rgba(root.fb.r, root.fb.g, root.fb.b, 0.03)
+          border.width: 1
+          border.color: Qt.rgba(root.fb.r, root.fb.g, root.fb.b, 0.15)
+
+          RowLayout {
+            anchors.fill: parent
+            anchors.margins: 6
+            spacing: 8
+
+            // Mini Axial Tilt Canvas
+            Canvas {
+              id: tiltCanvas
+              Layout.preferredWidth: 90
+              Layout.preferredHeight: 74
+              renderTarget: Canvas.Image
+
+              property real decl: root.simSolarDeclination
+              onDeclChanged: requestPaint()
+
+              onPaint: {
+                var ctx = getContext("2d")
+                ctx.reset()
+                ctx.clearRect(0, 0, width, height)
+
+                var cx = width / 2 + 6
+                var cy = height / 2
+                var R = 22
+                var pi = Math.PI
+
+                // Projected tilt angle based on current solar declination
+                var tiltRad = (tiltCanvas.decl * pi / 180)
+
+                // 1. Sunlight rays coming from left
+                ctx.strokeStyle = Qt.rgba(255/255, 204/255, 0/255, 0.7)
+                ctx.lineWidth = 1
+                for (var i = -1; i <= 1; i++) {
+                  var ly = cy + i * 12
+                  ctx.beginPath()
+                  ctx.moveTo(4, ly)
+                  ctx.lineTo(cx - R - 6, ly)
+                  ctx.lineTo(cx - R - 9, ly - 2)
+                  ctx.moveTo(cx - R - 6, ly)
+                  ctx.lineTo(cx - R - 9, ly + 2)
+                  ctx.stroke()
+                }
+
+                // 2. Earth Globe
+                ctx.save()
+                ctx.beginPath()
+                ctx.arc(cx, cy, R, 0, 2 * pi)
+                ctx.clip()
+
+                // Ocean base
+                ctx.fillStyle = Qt.rgba(root.fb.r, root.fb.g, root.fb.b, 0.12).toString()
+                ctx.fillRect(cx - R, cy - R, 2 * R, 2 * R)
+
+                // Left illuminated hemisphere (sunlight from left)
+                var litGrad = ctx.createLinearGradient(cx - R, cy, cx + R * 0.2, cy)
+                litGrad.addColorStop(0, Qt.rgba(root.fb.r, root.fb.g, root.fb.b, 0.75).toString())
+                litGrad.addColorStop(1, Qt.rgba(root.fb.r, root.fb.g, root.fb.b, 0.25).toString())
+                ctx.fillStyle = litGrad
+                ctx.beginPath()
+                ctx.arc(cx, cy, R, pi / 2, 3 * pi / 2, false)
+                ctx.fill()
+
+                // Night shadow on right
+                ctx.fillStyle = Qt.rgba(0, 0, 0, 0.65).toString()
+                ctx.beginPath()
+                ctx.arc(cx, cy, R, -pi / 2, pi / 2, false)
+                ctx.fill()
+                ctx.restore()
+
+                // 3. Equator (tilted perpendicular to axis)
+                ctx.save()
+                ctx.translate(cx, cy)
+                ctx.rotate(-tiltRad)
+                ctx.strokeStyle = Qt.rgba(root.fb.r, root.fb.g, root.fb.b, 0.4).toString()
+                ctx.lineWidth = 0.8
+                ctx.beginPath()
+                ctx.ellipse(-R, -R * 0.18, 2 * R, 2 * R * 0.18)
+                ctx.stroke()
+                ctx.restore()
+
+                // 4. Tilted rotational axis (23.44°)
+                var axisLen = R + 10
+                // When decl > 0 (Summer), North pole tilts to left (-X) towards sun
+                var nx = cx - Math.sin(tiltRad) * axisLen
+                var ny = cy - Math.cos(tiltRad) * axisLen
+                var sx = cx + Math.sin(tiltRad) * axisLen
+                var sy = cy + Math.cos(tiltRad) * axisLen
+
+                ctx.strokeStyle = Qt.rgba(root.fb.r, root.fb.g, root.fb.b, 0.7).toString()
+                ctx.lineWidth = 1.2
+                ctx.beginPath()
+                ctx.moveTo(sx, sy)
+                ctx.lineTo(nx, ny)
+                ctx.stroke()
+
+                // Pole tips: N (red/warm) and S (blue/cyan)
+                ctx.fillStyle = "#ff6b6b"
+                ctx.beginPath(); ctx.arc(nx, ny, 2.5, 0, 2 * pi); ctx.fill()
+                ctx.fillStyle = "#4dabf7"
+                ctx.beginPath(); ctx.arc(sx, sy, 2.5, 0, 2 * pi); ctx.fill()
+
+                // Labels
+                ctx.fillStyle = root.fb.toString()
+                ctx.font = "8px monospace"
+                ctx.textAlign = "center"
+                ctx.fillText("N", nx + (tiltRad > 0 ? -5 : 5), ny + 1)
+                ctx.fillText("S", sx + (tiltRad > 0 ? 5 : -5), sy + 3)
+
+                // Globe outline
+                ctx.strokeStyle = Qt.rgba(root.fb.r, root.fb.g, root.fb.b, 0.45).toString()
+                ctx.lineWidth = 0.8
+                ctx.beginPath()
+                ctx.arc(cx, cy, R, 0, 2 * pi)
+                ctx.stroke()
+              }
+            }
+
+            // Seasonal Badges and Details
+            ColumnLayout {
+              Layout.fillWidth: true
+              spacing: 3
+
+              Label {
+                text: "AXIAL TILT 23.44°"
+                font.family: "monospace"
+                font.pixelSize: 8
+                font.letterSpacing: 1
+                font.weight: Font.Bold
+                color: Color.accent
+              }
+
+              RowLayout {
+                spacing: 4
+                Label { text: "NORTH:"; font.family: "monospace"; font.pixelSize: 9; color: root.dimFb }
+                Label { text: root.simNorthSeason; font.family: "monospace"; font.pixelSize: 9; font.weight: Font.DemiBold; color: root.fb }
+              }
+
+              RowLayout {
+                spacing: 4
+                Label { text: "SOUTH:"; font.family: "monospace"; font.pixelSize: 9; color: root.dimFb }
+                Label { text: root.simSouthSeason; font.family: "monospace"; font.pixelSize: 9; font.weight: Font.DemiBold; color: root.fb }
+              }
+
+              Label {
+                text: "Solar Decl: " + (root.simSolarDeclination >= 0 ? "+" : "") + root.simSolarDeclination.toFixed(1) + "°"
+                font.family: "monospace"
+                font.pixelSize: 8
+                color: root.dimFb
+              }
+            }
+          }
+
+          ToolTip {
+            visible: tiltMa.containsMouse
+            delay: 150
+            timeout: 6000
+            contentItem: Text {
+              text: "Earth's 23.44° axial tilt relative to its orbital plane causes the seasons. The hemisphere tilted toward the Sun receives direct rays and longer days (Summer), while the opposite hemisphere experiences Winter."
+              font.family: "monospace"
+              font.pixelSize: 10
+              color: root.fb
+              wrapMode: Text.WordWrap
+            }
+            background: Rectangle {
+              color: Qt.rgba(20/255, 24/255, 32/255, 0.96)
+              border.color: Qt.rgba(root.fb.r, root.fb.g, root.fb.b, 0.3)
+              radius: 6
+            }
+          }
+
+          MouseArea {
+            id: tiltMa
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
           }
         }
       }
