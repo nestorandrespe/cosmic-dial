@@ -2,7 +2,6 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import Quickshell
-import Quickshell.Io
 import qs.Ui
 import qs.Commons
 import "WorldGeoJSON.js" as Geo
@@ -12,8 +11,6 @@ Panel {
   id: root
   moduleName: "nestor.lunar-tracker"
   ipcTarget: "nestor.lunar-tracker"
-
-  readonly property string home: Quickshell.env("HOME")
 
   readonly property color fb: root.bar ? root.bar.foreground : Color.foreground
   readonly property color dimFb: Qt.rgba(fb.r, fb.g, fb.b, 0.5)
@@ -98,6 +95,10 @@ Panel {
     if (Math.abs(next) < 0.01) next = 0.0;
     root.timeOffsetDays = next;
   }
+
+  readonly property string simPhaseName: getPhaseName(simPhaseFraction)
+  readonly property string simPhaseEmoji: getPhaseEmoji(simPhaseFraction)
+  readonly property int simLunation: Math.floor(simDaysSince / simSynodic) + 953
 
   readonly property string phaseName: simPhaseName
   readonly property string phaseEmoji: simPhaseEmoji
