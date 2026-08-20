@@ -62,6 +62,31 @@ omarchy plugin add https://github.com/nestorandrespe/cosmic-dial.git --enable
 
 ---
 
+## 🗑️ Uninstallation
+
+### Option 1: Using the Omarchy CLI (Recommended)
+
+Run the following command in your terminal:
+
+```bash
+omarchy plugin remove nestor.lunar-tracker
+```
+
+### Option 2: Manual Uninstallation
+
+1. Delete the plugin directory:
+   ```bash
+   rm -rf ~/.config/omarchy/plugins/nestor.lunar-tracker
+   ```
+
+2. If you added it manually, remove the widget entry from your `~/.config/omarchy/shell.json` configuration file.
+3. Reload the shell:
+   ```bash
+   omarchy-restart-shell
+   ```
+
+---
+
 ## 🛠️ Technology Stack
 
 - **Framework**: [Quickshell](https://quickshell.outfoxxed.me/) & Qt6 QML / QtQuick
