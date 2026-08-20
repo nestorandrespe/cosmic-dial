@@ -162,51 +162,61 @@ Panel {
         Canvas {
           id: moonIcon
           anchors.fill: parent
+          renderTarget: Canvas.Image
 
           property real phase: root.phaseFraction
 
           onPaint: {
             var ctx = getContext("2d")
+            ctx.reset()
             ctx.clearRect(0, 0, width, height)
             var cx = width / 2
             var cy = height / 2
-            var r = Math.min(width, height) / 2
-
-            var f = moonIcon.phase
+            var r = Math.min(width, height) / 2 - 1
             var pi = Math.PI
+            var f = moonIcon.phase
 
-            // Base outline (hollow moon)
-            ctx.strokeStyle = root.fb.toString()
-            ctx.lineWidth = 1.2
+            // Base outline (dark disk)
+            ctx.fillStyle = Qt.rgba(root.fb.r, root.fb.g, root.fb.b, 0.15).toString()
             ctx.beginPath()
-            ctx.arc(cx, cy, r, 0, 2 * Math.PI)
-            ctx.stroke()
-
-            // Fill illuminated part with the same foreground color
-            ctx.fillStyle = root.fb.toString()
-            ctx.beginPath()
-
-            // Outer arc on the right (sunlit side)
-            ctx.arc(cx, cy, r, -pi/2, pi/2, f > 0.5)
-
-            // Terminator line
-            var terminatorX
-            if (f <= 0.5) {
-              terminatorX = r * (1 - 4 * f)
-            } else {
-              terminatorX = r * (4 * f - 3)
-            }
-
-            var steps = 15
-            for (var i = 0; i <= steps; i++) {
-              var angle = pi/2 - (pi * i / steps)
-              var x = cx + terminatorX * Math.cos(angle)
-              var y = cy - r * Math.sin(angle)
-              ctx.lineTo(x, y)
-            }
-
-            ctx.closePath()
+            ctx.arc(cx, cy, r, 0, 2 * pi)
             ctx.fill()
+
+            // Fill illuminated part
+            var illumFrac = (1 - Math.cos(2 * pi * f)) / 2
+            if (illumFrac > 0.01) {
+              ctx.fillStyle = root.fb.toString()
+              ctx.beginPath()
+              var steps = 18
+              if (f <= 0.5) {
+                ctx.arc(cx, cy, r, -pi / 2, pi / 2, false)
+                var k = Math.cos(2 * pi * f)
+                for (var i = 0; i <= steps; i++) {
+                  var theta = pi / 2 - (pi * i / steps)
+                  var tx = cx + k * r * Math.cos(theta)
+                  var ty = cy + r * Math.sin(theta)
+                  ctx.lineTo(tx, ty)
+                }
+              } else {
+                ctx.arc(cx, cy, r, pi / 2, 3 * pi / 2, false)
+                var k = -Math.cos(2 * pi * f)
+                for (var i = 0; i <= steps; i++) {
+                  var theta = -pi / 2 + (pi * i / steps)
+                  var tx = cx + k * r * Math.cos(theta)
+                  var ty = cy + r * Math.sin(theta)
+                  ctx.lineTo(tx, ty)
+                }
+              }
+              ctx.closePath()
+              ctx.fill()
+            }
+
+            // Outline
+            ctx.strokeStyle = root.fb.toString()
+            ctx.lineWidth = 1.1
+            ctx.beginPath()
+            ctx.arc(cx, cy, r, 0, 2 * pi)
+            ctx.stroke()
           }
 
           onPhaseChanged: requestPaint()
@@ -267,21 +277,111 @@ Panel {
           }
 
           Rectangle {
-            implicitWidth: phaseBadgeText.implicitWidth + 20
+            implicitWidth: badgeRow.implicitWidth + 20
             implicitHeight: 22
             radius: 11
             color: Qt.rgba(root.fb.r, root.fb.g, root.fb.b, 0.08)
             border.width: 1
             border.color: Qt.rgba(root.fb.r, root.fb.g, root.fb.b, 0.2)
 
-            Label {
-              id: phaseBadgeText
+            RowLayout {
+              id: badgeRow
               anchors.centerIn: parent
-              text: root.simPhaseEmoji + " " + root.simPhaseName.toUpperCase() + " (" + root.simIllumination.toFixed(0) + "%)"
-              font.family: "monospace"
-              font.pixelSize: 8
-              font.weight: Font.Medium
-              color: root.fb
+              spacing: 6
+
+              Canvas {
+                id: headerMoonCanvas
+                Layout.preferredWidth: 13
+                Layout.preferredHeight: 13
+                renderTarget: Canvas.Image
+
+                property real phaseFrac: root.simPhaseFraction
+                property real illum: root.simIllumination
+
+                onPhaseFracChanged: requestPaint()
+                onIllumChanged: requestPaint()
+
+                onPaint: {
+                  var ctx = getContext("2d")
+                  ctx.reset()
+                  ctx.clearRect(0, 0, width, height)
+
+                  var cx = width / 2
+                  var cy = height / 2
+                  var R = width / 2 - 1.2
+                  var pi = Math.PI
+
+                  // Base dark
+                  ctx.fillStyle = "#14171f"
+                  ctx.beginPath()
+                  ctx.arc(cx, cy, R, 0, 2 * pi)
+                  ctx.fill()
+
+                  var darkGrad = ctx.createRadialGradient(cx - R * 0.3, cy - R * 0.3, 0, cx, cy, R)
+                  darkGrad.addColorStop(0, "#252b3b")
+                  darkGrad.addColorStop(1, "#101217")
+                  ctx.fillStyle = darkGrad
+                  ctx.beginPath()
+                  ctx.arc(cx, cy, R, 0, 2 * pi)
+                  ctx.fill()
+
+                  var phaseFrac = root.simPhaseFraction
+                  var illumFrac = root.simIllumination / 100.0
+
+                  if (illumFrac > 0.01) {
+                    ctx.save()
+                    ctx.beginPath()
+                    ctx.arc(cx, cy, R, 0, 2 * pi)
+                    ctx.clip()
+
+                    var litGrad = ctx.createRadialGradient(cx - R * 0.3, cy - R * 0.3, 0, cx, cy, R)
+                    litGrad.addColorStop(0, Qt.rgba(root.fb.r, root.fb.g, root.fb.b, 0.98).toString())
+                    litGrad.addColorStop(0.75, Qt.rgba(root.fb.r * 0.88, root.fb.g * 0.90, root.fb.b * 0.94, 0.98).toString())
+                    litGrad.addColorStop(1, Qt.rgba(root.fb.r * 0.74, root.fb.g * 0.78, root.fb.b * 0.85, 0.98).toString())
+                    ctx.fillStyle = litGrad
+
+                    ctx.beginPath()
+                    var steps = 20
+                    if (phaseFrac <= 0.5) {
+                      ctx.arc(cx, cy, R, -pi / 2, pi / 2, false)
+                      var k = Math.cos(2 * pi * phaseFrac)
+                      for (var i = 0; i <= steps; i++) {
+                        var theta = pi / 2 - (pi * i / steps)
+                        var tx = cx + k * R * Math.cos(theta)
+                        var ty = cy + R * Math.sin(theta)
+                        ctx.lineTo(tx, ty)
+                      }
+                    } else {
+                      ctx.arc(cx, cy, R, pi / 2, 3 * pi / 2, false)
+                      var k = -Math.cos(2 * pi * phaseFrac)
+                      for (var i = 0; i <= steps; i++) {
+                        var theta = -pi / 2 + (pi * i / steps)
+                        var tx = cx + k * R * Math.cos(theta)
+                        var ty = cy + R * Math.sin(theta)
+                        ctx.lineTo(tx, ty)
+                      }
+                    }
+                    ctx.closePath()
+                    ctx.fill()
+                    ctx.restore()
+                  }
+
+                  ctx.strokeStyle = Qt.rgba(root.fb.r, root.fb.g, root.fb.b, 0.45).toString()
+                  ctx.lineWidth = 0.8
+                  ctx.beginPath()
+                  ctx.arc(cx, cy, R, 0, 2 * pi)
+                  ctx.stroke()
+                }
+              }
+
+              Label {
+                id: phaseBadgeText
+                text: root.simPhaseName.toUpperCase() + " (" + root.simIllumination.toFixed(0) + "%)"
+                font.family: "monospace"
+                font.pixelSize: 8
+                font.weight: Font.Medium
+                color: root.fb
+              }
             }
           }
 
