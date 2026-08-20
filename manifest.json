@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "nestor.lunar-tracker",
+  "name": "Cosmic Dial",
+  "version": "1.0.0",
+  "author": "Nestor",
+  "description": "Astronomical dashboard featuring lunar phases, Earth-Sun dynamics, day/night projection, and planetary orrery",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Cosmic Dial",
+    "description": "Astronomical dashboard with lunar cycle, solar orbit, and planetary systems",
+    "category": "Info",
+    "allowMultiple": false
+  }
+}
